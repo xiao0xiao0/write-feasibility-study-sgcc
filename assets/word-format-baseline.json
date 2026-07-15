@@ -1,0 +1,86 @@
+{
+  "_说明": "机器可读的国网Word备用格式参数；技术键名保持英文，具体规则以中文word-format-spec.md为准。",
+  "units": {
+    "font_size": "half-points",
+    "paragraph_and_page": "twips",
+    "drawing_extent": "EMU"
+  },
+  "portrait_page": {
+    "width": 11907,
+    "height": 16840,
+    "margins": {
+      "top": 1440,
+      "bottom": 1440,
+      "left": 1304,
+      "right": 1247,
+      "header": 851,
+      "footer": 992
+    }
+  },
+  "styles": {
+    "body": {
+      "style_name": "SG-正文",
+      "east_asia_font": "仿宋_GB2312",
+      "latin_font": "Times New Roman",
+      "size_half_points": 24,
+      "alignment": "both",
+      "first_line_twips": 480,
+      "line_twips": 360,
+      "line_rule": "auto"
+    },
+    "chapter_heading": {
+      "style_name": "SG-章标题",
+      "east_asia_font": "方正黑体_GBK",
+      "size_half_points": 32,
+      "alignment": "left",
+      "first_line_twips": 0,
+      "before_twips": 240,
+      "after_twips": 120
+    },
+    "second_heading": {
+      "style_name": "SG-二级标题",
+      "bold": true,
+      "alignment": "left",
+      "first_line_twips": 0,
+      "before_twips": 120
+    },
+    "third_heading": {
+      "style_name": "SG-三级标题",
+      "bold": true,
+      "alignment": "left",
+      "first_line_twips": 0,
+      "before_twips": 120
+    },
+    "figure_caption": {
+      "style_name": "SG-图题",
+      "east_asia_font": "宋体",
+      "size_half_points": 21,
+      "alignment": "center",
+      "first_line_twips": 0,
+      "before_twips": 60,
+      "after_twips": 120,
+      "line_twips": 240
+    },
+    "display_equation": {
+      "style_name": "MTDisplayEquation",
+      "base_style_name": "SG-公式",
+      "center_tab_twips": 4680,
+      "right_tab_twips": 9360,
+      "tab_values_are_fallback_only": true,
+      "recompute_tabs_per_paragraph": true,
+      "first_line_twips": 0,
+      "required_real_tabs": 2,
+      "ole_prog_id": "Equation.DSMT4",
+      "automatic_numbering": true,
+      "number_format_preset": "ascii-chapter-dash",
+      "number_format_template": "(#C1-#E1)"
+    },
+    "variable_explanation": {
+      "style_name": "MTVariableExplanation",
+      "prefix": "式中，",
+      "left_indent_twips": 0,
+      "first_line_twips": 0,
+      "require_inline_mathtype_variables": true
+    }
+  }
+}

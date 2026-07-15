@@ -1,0 +1,50 @@
+# 国网科技项目可研“项目简报”字段模板。
+# 字段名保留英文，便于脚本稳定读取；填写内容和说明均使用中文。
+project:
+  title: ""
+  application_unit: ""
+  project_site: ""
+  sgcc_template_path: ""
+  latest_docx_path: ""
+  start_date: "YYYY-MM"  # 项目开始年月
+  end_date: "YYYY-MM"    # 项目结束年月
+  total_budget_wan: null
+
+actual_foundation:
+  existing_project: ""
+  available_data: []
+  available_devices_or_platforms: []
+  verified_prior_results: []
+  unavailable_or_out_of_scope_objects: []
+
+research_contents:
+  - title: ""
+    internal_points: []  # 按已确认的实际研究任务添加，不预设数量
+
+deliverables:
+  - name: ""
+    quantity: null
+    acceptance_indicators: []
+
+budget:
+  material_expense_wan: null
+  external_research_wan: null
+  external_testing_processing_wan: null
+  other_categories: {}
+
+approved_sources:
+  sgcc_reference_reports: []
+  project_materials: []
+  policies_and_standards: []
+  literature: []
+
+format_preferences:
+  include_toc: false  # 默认不生成目录
+  output_pdf: false   # 默认不生成PDF
+  equation_numbering: "mathtype-native-chapter-sequence"  # 原生MathType按章自动编号
+  mathtype_number_preset: "ascii-chapter-dash"  # (#C1-#E1)，显示为(3-1)
+  mathtype_explanation_prefix: "式中，"
+  require_equation_dsmt4: true
+  citation_style: "superscript-numeric"    # 顺序编码制上标引用
+
+missing_information: []

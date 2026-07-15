@@ -1,0 +1,285 @@
+# 国网可研MathType接入与参考文献规范
+
+## 目录
+
+1. 职责边界
+2. 数学内容撰写规则
+3. 国网公式编号配置
+4. 公式与变量写入Word
+5. “式中，”变量解释
+6. 公式内容质量
+7. 文内引用与参考文献
+8. 交付前检查
+
+## 1. 职责边界
+
+本文件只规定国网可研中的公式内容、变量命名、编号口径、解释方式和引用格式。进入Word模式后，由国网可研技能自动加载`word-mathtype-native-equations`；原生MathType对象生成、自动编号字段、Word COM操作、制表位计算和对象级验证均交由该依赖完成，不得要求用户另行调用，也不得在本技能中另建一套转换流程。
+
+最终DOCX必须满足：
+
+- 所有要求转换的显示公式和数学变量均为`Equation.DSMT4` OLE对象；
+- `OMaths.Count = 0`，不得混用Word OMath；
+- 不得用斜体文本、图片、Equation Editor 3或未转换LaTeX冒充MathType；
+- 编号公式使用MathType/Word字段，不得手工输入静态`(3-1)`；
+- 最终正文不得残留`$...$`、`\[...\]`、`⟦MTI:...⟧`、`⟦MTD:...⟧`或`⟦MTN:...⟧`。
+
+## 2. 数学内容撰写规则
+
+在聊天草稿、内部内容稿或MathType占位符中，可以使用LaTeX表达数学内容；此处的LaTeX仅是转换源，不是最终Word排版形式。
+
+- 物理变量使用数学斜体。
+- 设备类型、运行工况和英文缩写作为上下标时使用`\mathrm{}`正体。
+- 向量写为`\boldsymbol{x}_{t}`，矩阵写为`\mathbf{A}_{t}`，集合写为`\mathcal{R}`，概率写为`\mathbb{P}(\cdot)`，期望写为`\mathbb{E}[\cdot]`。
+- 中文术语、单位、标点和解释性文字不得放进数学对象。
+- 同一变量在全文保持唯一写法。
+
+推荐源表达：
+
+- `P_{t}^{\mathrm{pv}}`、`P_{t}^{\mathrm{wt}}`、`P_{t}^{\mathrm{load}}`；
+- `P_{\max}^{\mathrm{grid}}`、`E^{\mathrm{ess}}`；
+- `q_{r,t}^{\mathrm{ch}}`、`q_{r,t}^{\mathrm{dis}}`；
+- `M^{\mathrm{CO}_{2}}`。
+
+除非项目另有定义，功率用$P$、单位kW；电量用$E$、单位kWh；成本用$C$或$F$；碳排放用$M^{\mathrm{CO}_{2}}$；时间步长用$\Delta t$、单位h。这里的`$...$`只用于规则文件和聊天显示，写入最终Word时必须转换为内嵌MathType对象。
+
+## 3. 国网公式编号配置
+
+### 3.1 新建可研的默认配置
+
+- 显示形式：半角括号加“章号-公式序号”，例如`(3-1)`。
+- `MTEquationNumber2`：`(#C1-#E1)`。
+- 编码安全预设：`ascii-chapter-dash`。
+- 重置范围：按章重置公式序号。
+- 从第一章开始，在每个主章标题之前依次插入MathType章控制字段；即使第一、二章没有公式，也必须推进章号，使第三章首个公式正确显示为`(3-1)`。控制字段不得写进标题文字或目录文字。
+- 编号位于公式右侧，通过`MACROBUTTON MTPlaceRef`和`SEQ MTEqn`等MathType字段生成。
+
+### 3.2 修订既有可研
+
+- 先检查既有`MTEquationNumber2`、`MTDisplayEquation`、MathType编号字段和交叉引用。
+- 已存在MathType交叉引用时，禁止仅为改变标点而删除并重建编号；应说明引用失效风险并取得用户明确指示。
+- 用户最新母版已有稳定编号格式时优先保留；只有用户明确要求统一为国网默认格式时才迁移。
+- 无自动编号字段的旧报告可在新版本中迁移，但必须先建立编号与正文引用映射，完成后逐条验证可见编号和交叉引用。
+
+## 4. 公式与变量写入Word
+
+不要在本技能中复制或重写MathType宏和COM自动化步骤。每次执行前自动读取`word-mathtype-native-equations`的最新`SKILL.md`、`references/layout-numbering.md`和`references/automation.md`，以其当前流程为唯一实现依据。
+
+本技能只向其提交下列国网配置和内容清单：
+
+- 输入母版和另存的新版本路径；
+- 每个内嵌变量、无编号显示公式和编号显示公式的TeX源及目标位置；
+- 编号预设`ascii-chapter-dash`、模板`(#C1-#E1)`和按章重置要求；
+- 从第一章起完整推进的主章边界位置；
+- 变量解释前缀“式中，”及零缩进要求；
+- 预期`Equation.DSMT4`对象数、编号公式数和可见编号序列；
+- 表格内公式、混合分栏或通栏公式等特殊布局位置。
+
+表格内的数学变量或公式也必须转换为MathType对象，并根据单元格宽度居中，不套用正文公式的全页制表位。
+
+## 5. “式中，”变量解释
+
+- 创建或复用专用样式，例如`MTVariableExplanation`。
+- 段落直接以“式中，”起笔，左缩进、首行缩进、字符单位左缩进和字符单位首行缩进均为零。
+- 行距和正文保持一致，模板另有规定时从其规定。
+- 每个变量均转换为内嵌`Equation.DSMT4`对象。
+- 中文含义、单位、标点、取值范围和解释文字保留为普通Word文本。
+- 每个新增符号均说明含义，并根据需要给出单位、取值范围、索引集合或物理意义。
+- 同一变量已经解释且含义未变化时可不重复解释。
+
+## 6. 公式内容质量
+
+每组公式之前说明：
+
+- 所解决的具体问题；
+- 输入量；
+- 输出量或决策变量。
+
+根据项目需要，将功率平衡、状态演化、容量、系统交互、负荷调节、资源利用、成本、排放、生产/业务边界和可靠性等写成可计算约束。禁止只起装饰作用的概念公式。
+
+逻辑统一的分段函数或方程组保持为一个MathType公式对象并共用一个编号。只有在实际MathType环境中验证不能稳定转换时，才能拆为若干连续编号的可计算公式。
+
+## 7. 文内引用与参考文献
+
+- 按首次出现顺序采用顺序编码制。
+- Word正文中的文献编号设置为上标。
+- 标点位置以已确认国网样例为准，并在全文保持一致。
+- 优先引用权威政策文件、标准、官方报告及高水平同行评议期刊论文。
+- 条件允许时记录准确题名、作者、年份、刊物、DOI及来源路径或网址。
+- 每个文内编号对应一条参考文献，每条参考文献必须在正文出现。
+- 禁止引用搜索结果页面，禁止编造书目信息。
+
+## 8. 交付前检查
+
+国网文档检查与MathType检查必须分别执行：
+
+1. 运行本技能的`scripts/qa_docx.py`，检查章节、图表、引用、禁用语句和DOCX结构。
+2. 运行自动加载依赖中的`scripts/validate_mathtype_docx.py`，并传入预期MathType对象数、编号公式数、编号模板和可见编号（已知时）。
+3. 通过隐藏Word COM复核`Equation.DSMT4`、`OMaths.Count`、字段、制表位、“式中，”缩进和打开保存状态。
+
+必须标记：
+
+- 非`Equation.DSMT4`数学对象或Word OMath；
+- 静态公式编号、编号字段缺失或可见序列不一致；
+- `MTEquationNumber2`与确认格式不一致；
+- 残留LaTeX或占位符；
+- “式中，”段落仍有缩进；
+- 变量写法不一致或缺少解释；
+- 文内引用不是上标；
+- 参考文献…19158 tokens truncated…\s*\d+(?:[-.]\d+){0,2}\s*\)|（\s*\d+(?:[-.]\d+){0,2}\s*）)",
+        instruction_text,
+    )
+
+    bibliography_paragraph_ids = set()
+    body = document.find("w:body", NS)
+    in_bibliography = False
+    if body is not None:
+        for child in body:
+            if child.tag != qn("p"):
+                continue
+            value = node_text(child).strip()
+            style_name = style_names.get(paragraph_style(child), paragraph_style(child))
+            if value.startswith("参考文献"):
+                in_bibliography = True
+                bibliography_paragraph_ids.add(id(child))
+                continue
+            if in_bibliography and style_name == "SG-章标题":
+                in_bibliography = False
+            if in_bibliography:
+                bibliography_paragraph_ids.add(id(child))
+
+    all_xml = "\n".join(data.decode("utf-8", errors="ignore") for name, data in members.items() if name.endswith(".xml"))
+    if not (args.allow_toc or config.get("allow_toc", False)) and re.search(r"TOC\s+\\", all_xml, re.I):
+        add("major", "unexpected-toc", "document contains a TOC field")
+
+    for phrase in banned_phrases:
+        if phrase and phrase in full_text:
+            add("major", "banned-phrase", f"prohibited explanatory phrase remains: {phrase}")
+
+    heading_styles = {"SG-章标题", "SG-二级标题", "SG-三级标题", "SG-题内标题"}
+    caption_styles = {"SG-图题", "SG-表题"}
+    citation_runs = 0
+    citation_not_superscript = 0
+    for paragraph in paragraphs:
+        value = node_text(paragraph).strip()
+        sid = paragraph_style(paragraph)
+        style_name = style_names.get(sid, sid)
+        effective = effective_paragraph_ppr(paragraph, definitions)
+        first_line = effective.get("firstLine")
+        first_line_chars = effective.get("firstLineChars")
+
+        if style_name in heading_styles:
+            if (first_line not in {None, "0"}) or (first_line_chars not in {None, "0"}):
+                add("major", "heading-indent", f"{style_name} has nonzero first-line indent", value)
+        if style_name in caption_styles or re.match(r"^[图表]\s*\d+-\d+\s", value):
+            if effective.get("jc") != "center":
+                add("major", "caption-alignment", "caption is not centered", value)
+            if (first_line not in {None, "0"}) or (first_line_chars not in {None, "0"}):
+                add("major", "caption-indent", "caption has nonzero first-line indent", value)
+        if style_name == "SG-正文" and re.match(r"^[ 　]{1,}", node_text(paragraph)):
+            add("minor", "manual-body-indent", "body paragraph starts with manual spaces", value)
+        if re.match(r"^(式中|其中)[，,:：]", value) or style_name == "MTVariableExplanation":
+            left_indent = effective.get("left")
+            left_chars = effective.get("leftChars")
+            if (first_line not in {None, "0"}) or (first_line_chars not in {None, "0"}) or (left_indent not in {None, "0"}) or (left_chars not in {None, "0"}):
+                add("major", "variable-explanation-indent", "variable-explanation paragraph must have zero left and first-line indent", value)
+        if sid == "MTDisplayEquation" or style_name == "MTDisplayEquation":
+            tabs = len(paragraph.findall(".//w:tab", NS))
+            paragraph_instr = "".join(
+                node.text or "" for node in paragraph.findall(".//w:instrText", NS)
+            )
+            is_numbered = "MACROBUTTON MTPlaceRef" in paragraph_instr
+            if is_numbered and tabs < 2:
+                add("major", "formula-tabs", f"numbered MathType paragraph has {tabs} real tabs; expected at least 2", value)
+            static_label = re.search(r"\(\d+-\d+\)\s*$", node_text(paragraph))
+            if static_label and not is_numbered:
+                add("major", "static-formula-number", "formula number is static text rather than a MathType field", value)
+        for run in paragraph.findall("w:r", NS):
+            run_text = "".join((node.text or "") for node in run.findall("w:t", NS))
+            if id(paragraph) not in bibliography_paragraph_ids and "$" not in run_text and re.search(r"\[\d+(?:[-,—]\d+)*\]", run_text):
+                citation_runs += 1
+                vert = run.find("w:rPr/w:vertAlign", NS)
+                if vert is None or vert.get(qn("val")) != "superscript":
+                    citation_not_superscript += 1
+                    add("major", "citation-superscript", "numeric citation is not superscript", run_text)
+
+    residual_placeholders = re.findall(r"⟦MT[IDN]:.*?⟧", full_text, flags=re.S)
+    residual_display_tex = bool(re.search(r"\\\[.*?\\\]", full_text, flags=re.S))
+    residual_inline_tex = bool(re.search(r"\$[^$\r\n]{1,200}\$", full_text))
+    if residual_placeholders:
+        add("major", "mathtype-placeholder", "unconverted MathType placeholders remain")
+    if residual_display_tex or residual_inline_tex:
+        add("major", "residual-tex", "unconverted display or inline TeX remains in the final DOCX")
+    if omath_count:
+        add("major", "word-omath", f"Word OMath objects found: {omath_count}")
+    if expected_mathtype is not None and mathtype_ole_count != int(expected_mathtype):
+        add("major", "mathtype-count", f"expected {expected_mathtype} Equation.DSMT4 objects, found {mathtype_ole_count}")
+    if expected_numbered is not None and number_field_count != int(expected_numbered):
+        add("major", "mathtype-number-count", f"expected {expected_numbered} MathType numbers, found {number_field_count}")
+    if expected_embeddings is not None and counts["embedding_parts"] != int(expected_embeddings):
+        add("blocker", "embedding-count", f"expected {expected_embeddings} embedding parts, found {counts['embedding_parts']}")
+    if expected_number_format is not None and number_format != expected_number_format:
+        add("major", "mathtype-number-format", f"expected MTEquationNumber2={expected_number_format!r}, found {number_format!r}")
+
+    if args.baseline:
+        baseline_path = args.baseline.expanduser().resolve()
+        base_names, base_members, base_bad = package(baseline_path)
+        if base_bad:
+            add("blocker", "baseline-integrity", f"baseline has corrupt member: {base_bad}")
+        else:
+            base_document = ET.fromstring(base_members["word/document.xml"])
+            base_counts = part_counts(base_document, base_names)
+            fixed_keys = ["drawings", "header_parts", "footer_parts", "sections"]
+            if not allow_mathtype_changes:
+                fixed_keys.extend(["ole_objects", "embedding_parts"])
+            for key in fixed_keys:
+                if counts[key] != base_counts[key]:
+                    add("blocker", "package-count-change", f"{key} changed from {base_counts[key]} to {counts[key]}")
+            current_media = {name for name in names if name.startswith("word/media/")}
+            base_media = {name for name in base_names if name.startswith("word/media/")}
+            if current_media != base_media:
+                add("blocker", "media-set-change", "media part names changed unexpectedly")
+            for name in sorted(current_media & base_media):
+                if sha256(members[name]) != sha256(base_members[name]) and name not in allowed_media:
+                    add("major", "media-content-change", f"media changed without allowance: {name}")
+            current_embeddings = {name for name in names if name.startswith("word/embeddings/")}
+            base_embeddings = {name for name in base_names if name.startswith("word/embeddings/")}
+            if not allow_mathtype_changes:
+                if current_embeddings != base_embeddings:
+                    add("blocker", "embedding-set-change", "embedding part names changed")
+                else:
+                    for name in sorted(current_embeddings):
+                        if sha256(members[name]) != sha256(base_members[name]):
+                            add("blocker", "embedding-content-change", f"embedding changed: {name}")
+
+    severity_counts = Counter(issue["severity"] for issue in issues)
+    status = "fail" if severity_counts["blocker"] or severity_counts["major"] else ("warning" if severity_counts["minor"] else "pass")
+    result = {
+        "path": str(path),
+        "baseline": str(args.baseline.expanduser().resolve()) if args.baseline else None,
+        "status": status,
+        "counts": counts,
+        "mathtype_ole_count": mathtype_ole_count,
+        "other_ole_progids": other_ole_progids,
+        "omath_count": omath_count,
+        "number_field_count": number_field_count,
+        "mteqn_field_mentions": mteqn_mentions,
+        "mtchap_field_mentions": mtchap_mentions,
+        "mtsec_field_mentions": mtsec_mentions,
+        "visible_equation_numbers": visible_equation_numbers,
+        "mathtype_number_format": number_format,
+        "citation_runs_checked": citation_runs,
+        "citation_runs_not_superscript": citation_not_superscript,
+        "severity_counts": dict(severity_counts),
+        "issues": issues,
+    }
+    rendered = json.dumps(result, ensure_ascii=False, indent=2)
+    if args.output:
+        args.output.expanduser().resolve().write_text(rendered + "\n", encoding="utf-8")
+    print(rendered)
+    if args.no_fail:
+        return 0
+    return 2 if status == "fail" else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

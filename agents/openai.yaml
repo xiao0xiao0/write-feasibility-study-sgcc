@@ -1,0 +1,4 @@
+interface:
+  display_name: "SGCC国网科技项目可研写作"
+  short_description: "编写、修订、排版并质检国家电网科技项目可行性研究报告"
+  default_prompt: "使用$write-feasibility-study-sgcc，根据我的项目材料编写完整的国网科技项目可研；自动处理Word中的原生MathType公式、变量和按章编号。"
