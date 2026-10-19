@@ -9,13 +9,20 @@ from zipfile import BadZipFile, ZipFile
 
 
 def next_version_path(source: Path) -> Path:
-    match = re.search(r"(?i)(?P<prefix>[_-]?v)(?P<number>\d+)$", source.stem)
-    if match:
-        number = int(match.group("number")) + 1
-        stem = source.stem[: match.start()] + match.group("prefix") + str(number)
-    else:
-        stem = source.stem + "_V1"
-    return source.with_name(stem + source.suffix)
+    # Choose the final version token; keep descriptive/copy suffixes intact.
+    # A filename version identifies an output name, never the authoritative source.
+    tokens = list(re.finditer(r"(?i)(?P<prefix>[_-]?v)(?P<number>\d+(?:\.\d+)*)", source.stem))
+    suffix_pattern = r"(?:\s*[（(][^()（）]*[)）]|\s*[-_][^()（）]*)*"
+    for match in reversed(tokens):
+        suffix = source.stem[match.end():]
+        if not re.fullmatch(suffix_pattern, suffix):
+            continue
+        numbers = match.group("number").split(".")
+        width = len(numbers[-1])
+        numbers[-1] = str(int(numbers[-1]) + 1).zfill(width)
+        stem = source.stem[:match.start()] + match.group("prefix") + ".".join(numbers) + suffix
+        return source.with_name(stem + source.suffix)
+    return source.with_name(source.stem + "_V1" + source.suffix)
 
 
 def validate_docx(path: Path) -> None:
@@ -55,7 +62,11 @@ def main() -> int:
 
     if not args.dry_run:
         output.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, output)
+        # Another conversation may create this version after the existence check.
+        # Exclusive creation must still refuse to overwrite its result.
+        with source.open("rb") as original, output.open("xb") as destination:
+            shutil.copyfileobj(original, destination)
+        shutil.copystat(source, output)
         validate_docx(output)
 
     print(json.dumps({

@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZipFile
 from xml.etree import ElementTree as ET
 
-from ooxml_utils import parse_xml_preserving_prefixes, serialize_xml
+from ooxml_utils import parse_xml_preserving_prefixes, serialize_xml, write_docx_exclusive
 
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -49,6 +48,10 @@ def ensure_ordered_child(parent: ET.Element, name: str) -> ET.Element:
     desired = PPR_INDEX[name]
     insert_at = len(parent)
     for index, child in enumerate(parent):
+        # XML comments and processing instructions have callable tags. Preserve
+        # them in place; only element nodes participate in property ordering.
+        if not isinstance(child.tag, str):
+            continue
         local = child.tag.split("}")[-1]
         if PPR_INDEX.get(local, len(PPR_ORDER)) > desired:
             insert_at = index
@@ -153,12 +156,7 @@ def main() -> int:
             changed.append({"rule": applied, "text": value[:100]})
 
     members["word/document.xml"] = serialize_xml(document)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_suffix(output.suffix + ".tmp")
-    with ZipFile(temporary, "w", compression=ZIP_DEFLATED) as package:
-        for info in infos:
-            package.writestr(info, members[info.filename])
-    os.replace(temporary, output)
+    write_docx_exclusive(output, infos, members)
     report = {"source": str(source), "output": str(output), "changed_paragraphs": len(changed)}
     if args.verbose:
         report["changes"] = changed

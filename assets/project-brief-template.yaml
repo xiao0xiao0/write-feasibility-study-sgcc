@@ -1,14 +1,32 @@
-# 国网科技项目可研“项目简报”字段模板。
-# 字段名保留英文，便于脚本稳定读取；填写内容和说明均使用中文。
+# 在项目工作目录维护；这里只给字段示例，不预设课题或子点数量。
 project:
   title: ""
   application_unit: ""
   project_site: ""
   sgcc_template_path: ""
   latest_docx_path: ""
-  start_date: "YYYY-MM"  # 项目开始年月
-  end_date: "YYYY-MM"    # 项目结束年月
+  authoritative_source_reason: "" # 用户哪次指示指定了母版
+  start_date: ""
+  end_date: ""
   total_budget_wan: null
+
+revision:
+  mode: "" # discuss / chat_text / local_docx / full_docx
+  requested_scope: []
+  output_path: ""
+  output_version: ""
+  reference_versions: [] # 每项记录path、role、已吸收的修改，不自动取代母版
+  protected_objects: []
+  mark_changes_red: null
+  add_comments: null
+  comment_author: ""
+  affected_related_locations: []
+
+style_reference:
+  path: ""
+  section_anchor: ""
+  approved_structure: []
+  sentence_patterns: [] # 可选示例，不能取代研究内容
 
 actual_foundation:
   existing_project: ""
@@ -17,15 +35,23 @@ actual_foundation:
   verified_prior_results: []
   unavailable_or_out_of_scope_objects: []
 
-research_contents:
-  - title: ""
-    internal_points: []  # 按已确认的实际研究任务添加，不预设数量
+research_contents: []
+# 每项可按需包含id、title、status、internal_points。
+# internal_points按实际数量设置；各点可记录problem、inputs、methods、procedure、
+# outputs、validation、upstream_inputs、downstream_usage，不为填字段虚构事实。
 
-deliverables:
-  - name: ""
-    quantity: null
-    acceptance_indicators: []
+decisions:
+  confirmed: [] # 每项记录内容、范围、依据和日期/对话位置
+  rejected: [] # 明确删除/否定的内容及原因
+  superseded: [] # 被较新指示替代的决定及替代依据
 
+terminology:
+  preferred_terms: []
+  avoid_in_project_prose: []
+  accounting_or_model_boundaries: []
+  preserve_exact_source_titles: true
+
+deliverables: [] # 每项记录name、quantity、acceptance_indicators
 budget:
   material_expense_wan: null
   external_research_wan: null
@@ -36,15 +62,22 @@ approved_sources:
   sgcc_reference_reports: []
   project_materials: []
   policies_and_standards: []
-  literature: []
+  literature: [] # 保留稳定id、元数据、来源定位和核验状态
 
+figure_records: [] # 标题/研究点id、内容版本、源文件、输出文件、目标尺寸、确认状态
 format_preferences:
-  include_toc: false  # 默认不生成目录
-  output_pdf: false   # 默认不生成PDF
-  equation_numbering: "mathtype-native-chapter-sequence"  # 原生MathType按章自动编号
-  mathtype_number_preset: "ascii-chapter-dash"  # (#C1-#E1)，显示为(3-1)
+  include_toc: null # 修订保留现有目录；新建依模板决定
+  output_pdf: false
+  render_docx_pages: false # 仅用户当次明确要求检查最终版式时开启
+  equation_numbering: "mathtype-native-chapter-sequence"
+  mathtype_number_preset: "ascii-chapter-dash"
   mathtype_explanation_prefix: "式中，"
   require_equation_dsmt4: true
-  citation_style: "superscript-numeric"    # 顺序编码制上标引用
+  citation_style: "superscript-numeric"
+  citation_scope: "" # 允许引用的章节及依据；留空时按当前模板
 
+validation:
+  word_mathtype_com: "not_run"
+  docx_package: "not_run"
+  content_extraction: "not_run"
 missing_information: []

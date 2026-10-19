@@ -9,6 +9,8 @@ from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 from xml.etree import ElementTree as ET
 
+from docx_integrity_checks import audit_package, audit_citations, compare_protected_parts
+
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -24,6 +26,15 @@ def qn(name: str) -> str:
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def emit_report(result: dict, output: Path | None) -> None:
+    rendered = json.dumps(result, ensure_ascii=False, indent=2)
+    if output:
+        destination = output.expanduser().resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(rendered + "\n", encoding="utf-8")
+    print(rendered)
 
 
 def node_text(node: ET.Element) -> str:
@@ -133,7 +144,9 @@ def main() -> int:
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--config", type=Path, help="Optional UTF-8 JSON configuration")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--allow-toc", action="store_true")
+    toc_options = parser.add_mutually_exclusive_group()
+    toc_options.add_argument("--allow-toc", action="store_true", help="Allow TOC fields; existing TOCs are still preserved with a baseline")
+    toc_options.add_argument("--forbid-toc", action="store_true", help="Explicitly require no TOC fields")
     parser.add_argument("--no-fail", action="store_true", help="Always exit 0 after reporting")
     args = parser.parse_args()
 
@@ -141,15 +154,13 @@ def main() -> int:
     config = {}
     if args.config:
         config = json.loads(args.config.expanduser().resolve().read_text(encoding="utf-8"))
-    allowed_media = set(config.get("allowed_changed_media", []))
     allow_mathtype_changes = bool(config.get("allow_mathtype_object_changes", False))
     expected_mathtype = config.get("expected_mathtype_ole_count")
     expected_numbered = config.get("expected_numbered_equation_count")
     expected_embeddings = config.get("expected_embedding_part_count")
     expected_number_format = config.get("expected_mathtype_number_format")
-    banned_phrases = [
-        "可为章节组织、技术路线和算例设计提供参考",
-    ] + config.get("banned_phrases", [])
+    # Project-specific rejected terms belong to the project config, not global bans.
+    banned_phrases = config.get("banned_phrases", [])
 
     issues = []
 
@@ -161,21 +172,35 @@ def main() -> int:
     except Exception as exc:
         add("blocker", "invalid-docx", str(exc))
         result = {"path": str(path), "issues": issues, "status": "fail"}
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        emit_report(result, args.output)
         return 0 if args.no_fail else 2
 
-    required = {"[Content_Types].xml", "word/document.xml", "word/styles.xml", "word/_rels/document.xml.rels"}
+    required = {"[Content_Types].xml", "_rels/.rels", "word/document.xml", "word/styles.xml", "word/_rels/document.xml.rels"}
     for missing in sorted(required - set(names)):
         add("blocker", "missing-part", f"missing required DOCX part: {missing}")
     if bad:
         add("blocker", "zip-integrity", f"corrupt ZIP member: {bad}")
+    if len(names) != len(set(names)):
+        add("blocker", "duplicate-zip-member", "duplicate DOCX ZIP part names")
+    roots = audit_package(members, add)
+    base_members = None
+    if args.baseline:
+        try:
+            base_names, base_members, base_bad = package(args.baseline.expanduser().resolve())
+            if base_bad or len(base_names) != len(set(base_names)):
+                add("blocker", "baseline-integrity", "baseline has corrupt or duplicate ZIP members")
+            audit_package(base_members, lambda severity, code, message, context="": add(severity, "baseline-" + code, message, context))
+        except Exception as exc:
+            add("blocker", "baseline-integrity", str(exc))
     if any(issue["severity"] == "blocker" for issue in issues):
         result = {"path": str(path), "issues": issues, "status": "fail"}
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        emit_report(result, args.output)
         return 0 if args.no_fail else 2
 
-    document = ET.fromstring(members["word/document.xml"])
-    styles_root = ET.fromstring(members["word/styles.xml"])
+    document = roots["word/document.xml"]
+    styles_root = roots["word/styles.xml"]
+    if document.tag != qn("document"):
+        add("blocker", "unsupported-document-namespace", "expected transitional WordprocessingML document root")
     definitions = load_styles(styles_root)
     style_names = {sid: item["name"] for sid, item in definitions.items()}
     paragraphs = document.findall(".//w:p", NS)
@@ -196,27 +221,27 @@ def main() -> int:
         instruction_text,
     )
 
-    bibliography_paragraph_ids = set()
-    body = document.find("w:body", NS)
-    in_bibliography = False
-    if body is not None:
-        for child in body:
-            if child.tag != qn("p"):
-                continue
-            value = node_text(child).strip()
-            style_name = style_names.get(paragraph_style(child), paragraph_style(child))
-            if value.startswith("参考文献"):
-                in_bibliography = True
-                bibliography_paragraph_ids.add(id(child))
-                continue
-            if in_bibliography and style_name == "SG-章标题":
-                in_bibliography = False
-            if in_bibliography:
-                bibliography_paragraph_ids.add(id(child))
+    reference_audit = audit_citations(document, styles_root, add, config)
+    reference_audit.pop("bibliography_paragraph_ids")
 
-    all_xml = "\n".join(data.decode("utf-8", errors="ignore") for name, data in members.items() if name.endswith(".xml"))
-    if not (args.allow_toc or config.get("allow_toc", False)) and re.search(r"TOC\s+\\", all_xml, re.I):
-        add("major", "unexpected-toc", "document contains a TOC field")
+    def toc_count(parts):
+        root = ET.fromstring(parts["word/document.xml"])
+        codes = [item.text or "" for item in root.findall(".//w:instrText", NS)]
+        codes += [item.get(qn("instr"), "") for item in root.findall(".//w:fldSimple", NS)]
+        return sum(bool(re.search(r"\bTOC\b", code, re.I)) for code in codes)
+
+    toc_policy = config.get("toc_policy", "preserve" if base_members is not None else "allow")
+    if args.forbid_toc or config.get("allow_toc") is False:
+        toc_policy = "forbid"
+    elif args.allow_toc and base_members is None:
+        toc_policy = "allow"
+    if toc_policy not in {"preserve", "allow", "forbid"}:
+        raise ValueError("toc_policy must be preserve, allow, or forbid")
+    current_toc_count = toc_count(members)
+    if toc_policy == "forbid" and current_toc_count:
+        add("major", "unexpected-toc", "TOC field is explicitly forbidden for this task")
+    if toc_policy == "preserve" and base_members is not None and current_toc_count != toc_count(base_members):
+        add("major", "toc-not-preserved", "existing TOC field count changed without an explicit policy change")
 
     for phrase in banned_phrases:
         if phrase and phrase in full_text:
@@ -224,8 +249,6 @@ def main() -> int:
 
     heading_styles = {"SG-章标题", "SG-二级标题", "SG-三级标题", "SG-题内标题"}
     caption_styles = {"SG-图题", "SG-表题"}
-    citation_runs = 0
-    citation_not_superscript = 0
     for paragraph in paragraphs:
         value = node_text(paragraph).strip()
         sid = paragraph_style(paragraph)
@@ -250,24 +273,14 @@ def main() -> int:
             if (first_line not in {None, "0"}) or (first_line_chars not in {None, "0"}) or (left_indent not in {None, "0"}) or (left_chars not in {None, "0"}):
                 add("major", "variable-explanation-indent", "variable-explanation paragraph must have zero left and first-line indent", value)
         if sid == "MTDisplayEquation" or style_name == "MTDisplayEquation":
-            tabs = len(paragraph.findall(".//w:tab", NS))
             paragraph_instr = "".join(
                 node.text or "" for node in paragraph.findall(".//w:instrText", NS)
             )
             is_numbered = "MACROBUTTON MTPlaceRef" in paragraph_instr
-            if is_numbered and tabs < 2:
-                add("major", "formula-tabs", f"numbered MathType paragraph has {tabs} real tabs; expected at least 2", value)
+            # Formula -> actual Tab -> number and column width belong to the MathType validator.
             static_label = re.search(r"\(\d+-\d+\)\s*$", node_text(paragraph))
             if static_label and not is_numbered:
                 add("major", "static-formula-number", "formula number is static text rather than a MathType field", value)
-        for run in paragraph.findall("w:r", NS):
-            run_text = "".join((node.text or "") for node in run.findall("w:t", NS))
-            if id(paragraph) not in bibliography_paragraph_ids and "$" not in run_text and re.search(r"\[\d+(?:[-,—]\d+)*\]", run_text):
-                citation_runs += 1
-                vert = run.find("w:rPr/w:vertAlign", NS)
-                if vert is None or vert.get(qn("val")) != "superscript":
-                    citation_not_superscript += 1
-                    add("major", "citation-superscript", "numeric citation is not superscript", run_text)
 
     residual_placeholders = re.findall(r"⟦MT[IDN]:.*?⟧", full_text, flags=re.S)
     residual_display_tex = bool(re.search(r"\\\[.*?\\\]", full_text, flags=re.S))
@@ -287,36 +300,20 @@ def main() -> int:
     if expected_number_format is not None and number_format != expected_number_format:
         add("major", "mathtype-number-format", f"expected MTEquationNumber2={expected_number_format!r}, found {number_format!r}")
 
-    if args.baseline:
-        baseline_path = args.baseline.expanduser().resolve()
-        base_names, base_members, base_bad = package(baseline_path)
-        if base_bad:
-            add("blocker", "baseline-integrity", f"baseline has corrupt member: {base_bad}")
-        else:
-            base_document = ET.fromstring(base_members["word/document.xml"])
-            base_counts = part_counts(base_document, base_names)
-            fixed_keys = ["drawings", "header_parts", "footer_parts", "sections"]
-            if not allow_mathtype_changes:
-                fixed_keys.extend(["ole_objects", "embedding_parts"])
-            for key in fixed_keys:
-                if counts[key] != base_counts[key]:
-                    add("blocker", "package-count-change", f"{key} changed from {base_counts[key]} to {counts[key]}")
-            current_media = {name for name in names if name.startswith("word/media/")}
-            base_media = {name for name in base_names if name.startswith("word/media/")}
-            if current_media != base_media:
-                add("blocker", "media-set-change", "media part names changed unexpectedly")
-            for name in sorted(current_media & base_media):
-                if sha256(members[name]) != sha256(base_members[name]) and name not in allowed_media:
-                    add("major", "media-content-change", f"media changed without allowance: {name}")
-            current_embeddings = {name for name in names if name.startswith("word/embeddings/")}
-            base_embeddings = {name for name in base_names if name.startswith("word/embeddings/")}
-            if not allow_mathtype_changes:
-                if current_embeddings != base_embeddings:
-                    add("blocker", "embedding-set-change", "embedding part names changed")
-                else:
-                    for name in sorted(current_embeddings):
-                        if sha256(members[name]) != sha256(base_members[name]):
-                            add("blocker", "embedding-content-change", f"embedding changed: {name}")
+    part_changes = {"changed_parts": [], "added_parts": [], "removed_parts": []}
+    if base_members is not None:
+        base_document = ET.fromstring(base_members["word/document.xml"])
+        base_counts = part_counts(base_document, base_names)
+        expected_counts = config.get("expected_counts", {}).copy()
+        if allow_mathtype_changes and expected_mathtype is not None and expected_embeddings is not None:
+            original_mathtype = sum(node.get("ProgID") == "Equation.DSMT4" for node in base_document.findall(".//o:OLEObject", NS))
+            expected_counts.setdefault("ole_objects", base_counts["ole_objects"] + int(expected_mathtype) - original_mathtype)
+            expected_counts.setdefault("embedding_parts", int(expected_embeddings))
+        for key in ["drawings", "header_parts", "footer_parts", "sections", "ole_objects", "embedding_parts"]:
+            expected = int(expected_counts.get(key, base_counts[key]))
+            if counts[key] != expected:
+                add("blocker", "package-count-change", f"{key}: expected {expected}, found {counts[key]}")
+        part_changes = compare_protected_parts(base_members, members, config, add)
 
     severity_counts = Counter(issue["severity"] for issue in issues)
     status = "fail" if severity_counts["blocker"] or severity_counts["major"] else ("warning" if severity_counts["minor"] else "pass")
@@ -334,15 +331,18 @@ def main() -> int:
         "mtsec_field_mentions": mtsec_mentions,
         "visible_equation_numbers": visible_equation_numbers,
         "mathtype_number_format": number_format,
-        "citation_runs_checked": citation_runs,
-        "citation_runs_not_superscript": citation_not_superscript,
+        "citation_runs_checked": reference_audit["citation_groups_checked"],
+        "citation_runs_not_superscript": reference_audit["citation_groups_not_superscript"],
+        "references": reference_audit,
+        "toc_policy": toc_policy,
+        "toc_fields": current_toc_count,
+        "part_changes": part_changes,
+        "word_mathtype_com": "not_run",
+        "mathtype_layout_validation": "external_required" if number_field_count else "not_applicable",
         "severity_counts": dict(severity_counts),
         "issues": issues,
     }
-    rendered = json.dumps(result, ensure_ascii=False, indent=2)
-    if args.output:
-        args.output.expanduser().resolve().write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    emit_report(result, args.output)
     if args.no_fail:
         return 0
     return 2 if status == "fail" else 0

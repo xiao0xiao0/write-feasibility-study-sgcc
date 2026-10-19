@@ -69,11 +69,12 @@
       "tab_values_are_fallback_only": true,
       "recompute_tabs_per_paragraph": true,
       "first_line_twips": 0,
-      "required_real_tabs": 2,
       "ole_prog_id": "Equation.DSMT4",
       "automatic_numbering": true,
       "number_format_preset": "ascii-chapter-dash",
-      "number_format_template": "(#C1-#E1)"
+      "number_format_template": "(#C1-#E1)",
+      "require_tab_between_formula_and_number": true,
+      "layout_validation_owner": "word-mathtype-native-equations"
     },
     "variable_explanation": {
       "style_name": "MTVariableExplanation",
